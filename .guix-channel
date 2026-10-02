@@ -1,0 +1,4 @@
+(channel
+ (version 0)
+ (directory "modules")
+ (url "https://github.com/legendarymsr/Brave-origin-guix"))
