@@ -115,7 +115,7 @@
 (define-public brave-origin-nightly
   (package
     (name "brave-origin-nightly")
-    (version "1.98.46")
+    (version "1.99.9")
     (source
      (origin
        (method url-fetch)
@@ -123,7 +123,7 @@
              "https://github.com/brave/brave-browser/releases/download/v"
              version "/brave-origin-nightly_" version "_amd64.deb"))
        (sha256
-        (base32 "12hq8yiz7zhcpnf0dd0fndzripc22c1lhqvq73ik7hsd0mzq0ix6"))))
+        (base32 "02m2x2n9vrp7kal3s5vk0rf3d7ggnmjhz3zzzhl3k6ykpija0rj7"))))
     (build-system copy-build-system)
     (arguments
      (list
