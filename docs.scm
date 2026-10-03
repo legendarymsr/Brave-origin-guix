@@ -42,6 +42,12 @@ advice, the EFF (https://www.eff.org) may be able to help.")
     . "Version bumper.  Run with: guix repl -- update.scm")
    ("security.scm"
     . "Security model documentation — sandbox, privileges, provenance.")
+   ("install.scm"
+    . "Custom installer ISO config.  Build with: guix system image -t iso9660 install.scm")
+   ("system.scm"
+    . "Target operating-system declaration.  Apply with: guix system init system.scm /mnt")
+   ("home.scm"
+    . "Home-environment declaration.  Apply with: guix home reconfigure home.scm")
    ("docs.scm"
     . "This file.")
    ("README.scm"

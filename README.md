@@ -115,8 +115,8 @@ Browser + tiling WM ([Ratpoison](http://www.nongnu.org/ratpoison/)) + editor (Em
 Then apply:
 
 ```sh
-sudo guix system reconfigure /etc/config.scm
-guix home reconfigure ~/.config/guix/home.scm
+sudo guix system reconfigure system.scm
+guix home reconfigure home.scm
 ```
 
 ---
@@ -184,6 +184,27 @@ git commit -a -m "brave-origin-nightly: <old> -> <new>"
 
 ---
 
+## Custom installer ISO
+
+Build a bootable ISO with Brave Origin, Ratpoison, and install templates pre-loaded:
+
+```sh
+guix system image -t iso9660 install.scm
+```
+
+Write to USB:
+
+```sh
+sudo dd if=$(guix system image -t iso9660 install.scm) \
+         of=/dev/sdX bs=4M status=progress oflag=sync
+```
+
+The live environment boots with Xorg available (`startx` → Ratpoison). Installation templates are in `/etc/brave-origin-templates/` and the channel snippet is at `/etc/channels.scm`.
+
+See `install.scm` for the full build instructions and step-by-step install guide.
+
+---
+
 ## Repository layout
 
 ```
@@ -196,6 +217,9 @@ modules/
       brave-origin.scm             Guix Home service
       emacs.scm                    Guix Home service
       ratpoison.scm                Guix Home service
+install.scm                        custom installer ISO
+system.scm                         target operating-system declaration
+home.scm                           home-environment declaration
 update.scm                         version bumper
 security.scm                       security model
 docs.scm                           full source reference (Scheme)
