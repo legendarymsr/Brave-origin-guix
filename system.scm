@@ -46,6 +46,7 @@
  (gnu packages terminals)
  (gnu packages fonts)
  (gnu packages admin)
+ (gnu packages emacs)
  ;; This channel
  (brave-origin services brave-origin))
 
@@ -112,6 +113,7 @@
     ;; Xorg essentials
     xterm
     ratpoison
+    emacs-lucid                         ; editor (C-t e)
     ;; Fonts
     font-dejavu
     font-liberation

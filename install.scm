@@ -47,6 +47,7 @@
  (gnu packages admin)                   ; sudo, fastfetch
  (gnu packages curl)                    ; curl
  (gnu packages disk)                    ; parted, gptfdisk
+ (gnu packages emacs)                   ; emacs-lucid
  (gnu packages fonts)                   ; font-dejavu, font-liberation
  (gnu packages ratpoison)               ; ratpoison
  (gnu packages tls)                     ; openssl
@@ -126,6 +127,7 @@ exec ~a/bin/ratpoison
    font-dejavu                          ; xterm face (~/.Xdefaults)
    fastfetch
    ncurses                              ; clear, reset, tput
+   emacs-lucid                          ; editor (C-t e)
    ;; brave-origin-install (+ tools for doing it by hand)
    brave-origin-installer
    curl

@@ -222,7 +222,7 @@ Examples:
                           (guix channels)
                           (brave-origin services brave-origin))
              (use-service-modules base dbus desktop networking xorg)
-             (use-package-modules admin curl fonts ncurses ratpoison
+             (use-package-modules admin curl emacs fonts ncurses ratpoison
                                   version-control xorg)
 
              (operating-system
@@ -282,7 +282,7 @@ Examples:
 
                (packages
                 (append (list ratpoison xterm xsetroot font-dejavu git curl
-                              htop fastfetch ncurses)
+                              htop fastfetch ncurses emacs-lucid)
                         %base-packages))
 
                (services
