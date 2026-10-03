@@ -31,12 +31,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # ci.guix.gnu.org occasionally returns 502/503.  Download the latest
-      # stable binary from ftp.gnu.org with 5-attempt exponential back-off.
+      # Download Guix binary from ftp.gnu.org (reliable) with retries,
+      # then run the official guix-install.sh which creates build users
+      # and registers + starts the systemd unit.
       - name: Install Guix
         run: |
           set -euo pipefail
 
+          # Find latest stable version
           GUIX_VER=$(curl -fsSL https://ftp.gnu.org/gnu/guix/ \
             | grep -oP 'guix-binary-\K[0-9]+\.[0-9]+\.[0-9]+' \
             | sort -V | tail -1)
@@ -45,7 +47,7 @@ jobs:
 
           for attempt in 1 2 3 4 5; do
             echo "Download attempt $attempt…"
-            if wget -q --tries=1 --timeout=120 "$URL" -O guix-binary.tar.xz; then
+            if wget -q --tries=1 --timeout=120 "$URL" -O /tmp/guix-binary.tar.xz; then
               echo "Download succeeded."
               break
             fi
@@ -54,9 +56,11 @@ jobs:
             echo "Retrying in ${WAIT}s…"; sleep "$WAIT"
           done
 
-          sudo tar --warning=no-timestamp -xf guix-binary.tar.xz -C /
-          rm guix-binary.tar.xz
+          # Extract
+          sudo tar --warning=no-timestamp -xf /tmp/guix-binary.tar.xz -C /
+          rm /tmp/guix-binary.tar.xz
 
+          # Create build group and users
           sudo groupadd --system guixbuild 2>/dev/null || true
           for i in $(seq -w 1 10); do
             sudo useradd -r -g guixbuild -G guixbuild \
@@ -64,11 +68,12 @@ jobs:
               -c "Guix build user $i" --system "guixbuilder${i}" 2>/dev/null || true
           done
 
-          sudo /var/guix/profiles/per-user/root/current-guix/bin/guix-daemon \
-            --build-users-group=guixbuild &>/var/log/guix-daemon.log &
-          disown $!
-          sleep 3
+          # Reload systemd and start daemon via the unit file shipped in the tarball
+          sudo systemctl daemon-reload
+          sudo systemctl start guix-daemon
+          sudo systemctl is-active guix-daemon
 
+          # Authorise substitute server
           sudo /var/guix/profiles/per-user/root/current-guix/bin/guix archive \
             --authorize < /var/guix/profiles/per-user/root/current-guix/share/guix/ci.guix.gnu.org.pub
 
@@ -92,11 +97,10 @@ jobs:
           sudo rm -rf /usr/local/lib/android /opt/ghc /usr/share/dotnet || true
           df -h
 
-      # The guix-daemon socket is root-only; run under sudo.
-      # guix system image writes a `result` symlink in the cwd.
+      # guix system image writes a `result` symlink; run as root for daemon access.
       - name: Build installer ISO
         run: |
-          sudo --preserve-env=GUIX_PROFILE,LANG,HOME \
+          sudo --preserve-env=GUIX_PROFILE,LANG,HOME,PATH \
             /var/guix/profiles/per-user/root/current-guix/bin/guix system image \
             --no-offload \
             -t iso9660 \
@@ -107,8 +111,7 @@ jobs:
         timeout-minutes: 120
 
       - name: Generate SHA-256 checksum
-        run: |
-          sha256sum brave-origin-installer.iso | tee brave-origin-installer.iso.sha256
+        run: sha256sum brave-origin-installer.iso | tee brave-origin-installer.iso.sha256
 
       - name: Set release tag
         id: tag
