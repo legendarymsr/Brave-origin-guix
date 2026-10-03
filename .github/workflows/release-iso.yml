@@ -31,84 +31,102 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Download Guix binary from ftp.gnu.org (reliable) with retries,
-      # then run the official guix-install.sh which creates build users
-      # and registers + starts the systemd unit.
+      # Install the Guix release tarball and run guix-daemon as root.
+      #
+      # Why the earlier attempts never got a daemon:
+      #  * `sudo guix-daemon ... &>/var/log/guix-daemon.log &` — the redirect
+      #    is opened by the *runner's* (non-root) shell, so it fails with
+      #    "Permission denied" and guix-daemon is never started.
+      #  * `systemctl start guix-daemon` — the tarball only ships the unit
+      #    under current-guix/lib/systemd/system; nothing installs it, hence
+      #    "Unit guix-daemon.service not found".  (And the 1.5.0 unit runs the
+      #    daemon as an unprivileged `guix-daemon` user, which needs a chowned
+      #    store and unprivileged user namespaces that Ubuntu 24.04 restricts.)
+      # So: classic root daemon with build users, started as a transient
+      # systemd service (survives the end of this step, logs to the journal).
       - name: Install Guix
+        env:
+          GUIX_VER: '1.5.0'      # pinned: install.scm is tested against it
         run: |
           set -euo pipefail
+          TARBALL="guix-binary-${GUIX_VER}.x86_64-linux.tar.xz"
 
-          # Find latest stable version
-          GUIX_VER=$(curl -fsSL https://ftp.gnu.org/gnu/guix/ \
-            | grep -oP 'guix-binary-\K[0-9]+\.[0-9]+\.[0-9]+' \
-            | sort -V | tail -1)
-          URL="https://ftp.gnu.org/gnu/guix/guix-binary-${GUIX_VER}.x86_64-linux.tar.xz"
-          echo "Downloading Guix ${GUIX_VER} from ${URL}"
-
+          ok=
           for attempt in 1 2 3 4 5; do
-            echo "Download attempt $attempt…"
-            if wget -q --tries=1 --timeout=120 "$URL" -O /tmp/guix-binary.tar.xz; then
-              echo "Download succeeded."
-              break
-            fi
-            [[ $attempt -eq 5 ]] && { echo "All attempts failed."; exit 1; }
-            WAIT=$(( 15 * (2 ** (attempt - 1)) ))
-            echo "Retrying in ${WAIT}s…"; sleep "$WAIT"
+            for mirror in https://ftpmirror.gnu.org/gnu https://ftp.gnu.org/gnu; do
+              echo "Attempt $attempt: $mirror/guix/$TARBALL"
+              if curl -fL --retry 2 --connect-timeout 30 --max-time 600 \
+                   -o "/tmp/$TARBALL" "$mirror/guix/$TARBALL"; then
+                ok=1; break 2
+              fi
+            done
+            sleep $(( 15 * attempt ))
           done
+          [[ -n "$ok" ]] || { echo "Could not download $TARBALL"; exit 1; }
 
-          # Extract
-          sudo tar --warning=no-timestamp -xf /tmp/guix-binary.tar.xz -C /
-          rm /tmp/guix-binary.tar.xz
+          sudo tar --warning=no-timestamp -xf "/tmp/$TARBALL" -C /
+          rm "/tmp/$TARBALL"
+          GUIX=/var/guix/profiles/per-user/root/current-guix
+          sudo mkdir -p /root/.config/guix
+          sudo ln -sfn "$GUIX" /root/.config/guix/current
 
-          # Create build group and users
-          sudo groupadd --system guixbuild 2>/dev/null || true
+          sudo groupadd --system guixbuild
           for i in $(seq -w 1 10); do
-            sudo useradd -r -g guixbuild -G guixbuild \
-              -d /var/empty -s "$(which nologin)" \
-              -c "Guix build user $i" --system "guixbuilder${i}" 2>/dev/null || true
+            sudo useradd -g guixbuild -G guixbuild -d /var/empty \
+              -s "$(command -v nologin)" -c "Guix build user $i" \
+              --system "guixbuilder$i"
           done
 
-          # Reload systemd and start daemon via the unit file shipped in the tarball
-          sudo systemctl daemon-reload
-          sudo systemctl start guix-daemon
-          sudo systemctl is-active guix-daemon
+          sudo systemd-run --unit=guix-daemon --description="GNU Guix build daemon" \
+            --property=Environment=GUIX_LOCPATH=$GUIX/lib/locale \
+            --property=Environment=LC_ALL=C.UTF-8 \
+            "$GUIX/bin/guix-daemon" --build-users-group=guixbuild --discover=no \
+            --substitute-urls="https://bordeaux.guix.gnu.org https://ci.guix.gnu.org"
 
-          # Authorise substitute server
-          sudo /var/guix/profiles/per-user/root/current-guix/bin/guix archive \
-            --authorize < /var/guix/profiles/per-user/root/current-guix/share/guix/ci.guix.gnu.org.pub
+          for i in $(seq 1 30); do
+            [[ -S /var/guix/daemon-socket/socket ]] && break
+            sleep 1
+          done
+          if ! [[ -S /var/guix/daemon-socket/socket ]]; then
+            sudo systemctl status guix-daemon --no-pager || true
+            sudo journalctl -u guix-daemon --no-pager || true
+            exit 1
+          fi
+          sudo systemctl status guix-daemon --no-pager
 
-          echo "/var/guix/profiles/per-user/root/current-guix/bin" >> "$GITHUB_PATH"
-          echo "GUIX_PROFILE=/var/guix/profiles/per-user/root/current-guix" >> "$GITHUB_ENV"
-          echo "LANG=en_US.utf8" >> "$GITHUB_ENV"
+          for key in bordeaux.guix.gnu.org ci.guix.gnu.org; do
+            sudo "$GUIX/bin/guix" archive --authorize < "$GUIX/share/guix/$key.pub"
+          done
+
+          echo "$GUIX/bin" >> "$GITHUB_PATH"
+          echo "GUIX_LOCPATH=$GUIX/lib/locale" >> "$GITHUB_ENV"
+          "$GUIX/bin/guix" --version | head -1
         timeout-minutes: 20
-
-      - name: Cache Guix store
-        uses: actions/cache@v4
-        with:
-          path: /gnu/store
-          key: guix-store-${{ runner.os }}-${{ hashFiles('install.scm') }}-${{ github.run_id }}
-          restore-keys: |
-            guix-store-${{ runner.os }}-${{ hashFiles('install.scm') }}-
-            guix-store-${{ runner.os }}-
 
       - name: Free up disk space
         run: |
-          df -h
-          sudo rm -rf /usr/local/lib/android /opt/ghc /usr/share/dotnet || true
-          df -h
+          df -h /
+          sudo rm -rf /usr/local/lib/android /opt/ghc /usr/share/dotnet /opt/hostedtoolcache/CodeQL || true
+          df -h /
 
-      # guix system image writes a `result` symlink; run as root for daemon access.
-      - name: Build installer ISO
+      # The daemon socket is world-writable, so no sudo is needed here.
+      # `-L modules' puts this channel's (brave-origin ...) modules on the
+      # load path.  `guix system image' prints the image's store file name.
+      - name: Build live ISO
         run: |
-          sudo --preserve-env=GUIX_PROFILE,LANG,HOME,PATH \
-            /var/guix/profiles/per-user/root/current-guix/bin/guix system image \
-            --no-offload \
-            -t iso9660 \
-            install.scm
-          sudo cp -L result brave-origin-installer.iso
-          sudo chown "$(id -u):$(id -g)" brave-origin-installer.iso
-          echo "ISO size: $(du -sh brave-origin-installer.iso | cut -f1)"
-        timeout-minutes: 120
+          set -euo pipefail
+          IMAGE=$(guix system image -t iso9660 -L modules \
+                    --cores="$(nproc)" --max-jobs=2 install.scm | tail -1)
+          echo "Built $IMAGE"
+          cp "$IMAGE" brave-origin-installer.iso
+          chmod 644 brave-origin-installer.iso
+          ls -l brave-origin-installer.iso
+          echo "ISO size: $(du -h brave-origin-installer.iso | cut -f1)"
+        timeout-minutes: 150
+
+      - name: Daemon log (on failure)
+        if: failure()
+        run: sudo journalctl -u guix-daemon --no-pager | tail -200 || true
 
       - name: Generate SHA-256 checksum
         run: sha256sum brave-origin-installer.iso | tee brave-origin-installer.iso.sha256
@@ -137,11 +155,15 @@ jobs:
           body: |
             ## Brave Origin Guix System Installer ISO
 
-            Custom Guix System installer with Brave Origin (nightly) pre-configured.
+            Guix System live image: boots straight into Ratpoison (SLiM autologin
+            as `guest`) with Brave Origin (nightly) installed and opened on login,
+            plus the one-command installer.
 
             ### What's included
+            - Live Ratpoison session (prefix `C-t`: `b` Brave Origin, `t` xterm)
+            - Brave Origin + setuid `chrome-sandbox` via `brave-origin-service-type`
             - Brave Origin channel pre-seeded at `/etc/channels.scm`
-            - One-command installer: `bash /etc/brave-origin-templates/brave-origin-install /dev/sdX`
+            - One-command installer: `sudo bash /etc/brave-origin-templates/brave-origin-install /dev/sdX`
             - Templates at `/etc/brave-origin-templates/`
 
             ### Write to USB
