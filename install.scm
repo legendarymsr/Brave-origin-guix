@@ -161,6 +161,10 @@ exec ~a/bin/ratpoison
     'brave-origin-templates
     etc-service-type
     (list
+     ;; This channel's modules: brave-origin-install runs
+     ;; `guix system init -L' on them instead of pulling the channel.
+     (list "brave-origin-templates/channel"
+           (local-file "modules" "brave-origin-channel" #:recursive? #t))
      (list "brave-origin-templates/README"
            (plain-file "brave-origin-readme"
                        (string-append
