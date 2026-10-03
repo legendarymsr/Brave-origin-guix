@@ -54,14 +54,6 @@ jobs:
             guix-store-${{ runner.os }}-${{ hashFiles('install.scm') }}-
             guix-store-${{ runner.os }}-
 
-      # ── Update Guix ───────────────────────────────────────────────────
-      # Pull the latest Guix channel so we get current package versions
-      # and build fixes.  The brave-origin channel is NOT needed here
-      # because install.scm only references standard Guix modules.
-      - name: Update Guix
-        run: guix pull --disable-authentication
-        timeout-minutes: 30
-
       # ── Extra disk space ──────────────────────────────────────────────
       # GitHub's ubuntu-latest runner ships with ~25 GB free.
       # A Guix system ISO is typically 1–1.5 GB; the build itself needs
