@@ -43,7 +43,7 @@ advice, the EFF (https://www.eff.org) may be able to help.")
    ("security.scm"
     . "Security model documentation — sandbox, privileges, provenance.")
    ("install.scm"
-    . "Custom installer ISO config.  Build with: guix system image -t iso9660 install.scm")
+    . "Live + installer ISO: boots into Ratpoison with Brave Origin.  Build with: guix system image -t iso9660 -L modules install.scm")
    ("system.scm"
     . "Target operating-system declaration.  Apply with: guix system init system.scm /mnt")
    ("home.scm"

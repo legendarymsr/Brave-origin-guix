@@ -186,20 +186,24 @@ git commit -a -m "brave-origin-nightly: <old> -> <new>"
 
 ## Custom installer ISO
 
-Build a bootable ISO with Brave Origin, Ratpoison, and install templates pre-loaded:
+Build a bootable live ISO that boots straight into Ratpoison (SLiM autologin as
+`guest`) with Brave Origin open, plus the one-command installer. Run from the
+repository root so `-L modules` finds this channel:
 
 ```sh
-guix system image -t iso9660 install.scm
+guix system image -t iso9660 -L modules install.scm
 ```
 
 Write to USB:
 
 ```sh
-sudo dd if=$(guix system image -t iso9660 install.scm) \
+sudo dd if=$(guix system image -t iso9660 -L modules install.scm) \
          of=/dev/sdX bs=4M status=progress oflag=sync
 ```
 
-The live environment boots with Xorg available (`startx` → Ratpoison). Installation templates are in `/etc/brave-origin-templates/` and the channel snippet is at `/etc/channels.scm`.
+Ratpoison prefix is `C-t`: `C-t b` Brave Origin, `C-t t` xterm. To install, open
+an xterm and run `sudo bash /etc/brave-origin-templates/brave-origin-install /dev/sdX`.
+Installation templates are in `/etc/brave-origin-templates/` and the channel snippet is at `/etc/channels.scm`.
 
 See `install.scm` for the full build instructions and step-by-step install guide.
 
@@ -217,7 +221,7 @@ modules/
       brave-origin.scm             Guix Home service
       emacs.scm                    Guix Home service
       ratpoison.scm                Guix Home service
-install.scm                        custom installer ISO
+install.scm                        live (Ratpoison) + installer ISO
 system.scm                         target operating-system declaration
 home.scm                           home-environment declaration
 update.scm                         version bumper

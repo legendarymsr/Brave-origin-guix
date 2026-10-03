@@ -107,6 +107,10 @@ mount "$STORE" /mnt/gnu
 swapon "$SWAP"
 mkdir -p /mnt/etc
 
+# Send store writes to the target disk instead of the live image's RAM-backed
+# overlay (provided by the installation image; no-op elsewhere).
+herd start cow-store /mnt 2>/dev/null || true
+
 # ── Collect UUIDs ─────────────────────────────────────────────────────────────
 ROOT_UUID="$(blkid -s UUID -o value "$ROOT")"
 EFI_UUID="$(blkid -s UUID -o value "$EFI")"
