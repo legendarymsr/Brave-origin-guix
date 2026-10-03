@@ -1,0 +1,32 @@
+brave-origin-guix is dual-licensed under GPL-3.0 and MPL-2.0.
+You may use, modify, and distribute it under either license, at your option.
+
+  GPL-3.0  →  see LICENSE
+  MPL-2.0  →  see LICENSE-MPL
+
+Copyright (C) 2026 legendarymsr
+
+───────────────────────────────────────────────────────────────────────────────
+
+If you're wondering why both and not just GPL-3.0
+──────────────────────────────────────────────────
+GPL-3.0 is the preferred license here — it is strong copyleft, well understood
+in the free software world, and ensures that modifications to this packaging
+code cannot be folded into a closed product without sharing them back.
+
+However, this channel packages and distributes the Brave Origin binary, and
+Brave is licensed under MPL-2.0 by Brave Software, Inc. As a distributor of
+that binary, it is reasonable to honour the spirit of Brave's own license by
+making the packaging code available under MPL-2.0 as well. This keeps the
+licensing of the wrapper consistent with the software it wraps.
+
+MPL-2.0 is also a copyleft license, but a weaker one — it only requires
+modifications to MPL-licensed files to be shared, not the larger work around
+them. That is why GPL-3.0 is the stronger and preferred choice for this project.
+
+In short: GPL-3.0 is what this project stands behind. MPL-2.0 is offered
+alongside it out of respect for Brave's license, given that this channel exists
+specifically to distribute Brave Origin.
+
+If you just want to use the channel, none of this matters — do whatever you want.
+If you are redistributing or building on top of it, GPL-3.0 is recommended.
