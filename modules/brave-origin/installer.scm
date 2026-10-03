@@ -10,6 +10,8 @@
   #:use-module (gnu packages base)      ;coreutils
   #:use-module (gnu packages disk)      ;gptfdisk, parted, dosfstools
   #:use-module (gnu packages linux)     ;util-linux, e2fsprogs
+  #:use-module ((brave-origin home services ratpoison)
+                #:select (%brave-origin-ratpoisonrc))
   #:export (%brave-origin-xdefaults
             brave-origin-install-program
             brave-origin-installer))
@@ -261,10 +263,14 @@ Examples:
                           '("wheel" "netdev" "audio" "video" "input")))
                        %base-user-accounts))
 
-               ;; For new accounts: ~/.xinitrc (`startx' starts Ratpoison)
+               ;; For new accounts: ~/.xinitrc (`startx' starts Ratpoison),
+               ;; ~/.ratpoisonrc (C-t b Brave Origin, C-t t xterm, ...)
                ;; and ~/.Xdefaults (readable xterm).
                (skeletons
                 (cons* (list ".xinitrc" (plain-file "xinitrc" ,%xinitrc))
+                       (list ".ratpoisonrc"
+                             (plain-file "ratpoisonrc"
+                                         ,#$%brave-origin-ratpoisonrc))
                        (list ".Xdefaults"
                              (plain-file "Xdefaults" ,#$%brave-origin-xdefaults))
                        (list ".Xresources"
