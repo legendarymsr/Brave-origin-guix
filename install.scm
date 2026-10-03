@@ -44,7 +44,7 @@
  (gnu services dbus)                    ; dbus-root-service-type
  (gnu services networking)              ; connman, wpa-supplicant
  (gnu services xorg)                    ; slim, xorg-configuration
- (gnu packages admin)                   ; sudo
+ (gnu packages admin)                   ; sudo, fastfetch
  (gnu packages curl)                    ; curl
  (gnu packages disk)                    ; parted, gptfdisk
  (gnu packages fonts)                   ; font-dejavu, font-liberation
@@ -117,6 +117,7 @@ exec ~a/bin/ratpoison
    xterm
    xsetroot
    font-liberation
+   fastfetch
    ;; brave-origin-install (+ tools for doing it by hand)
    brave-origin-installer
    curl

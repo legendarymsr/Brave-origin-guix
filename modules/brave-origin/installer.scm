@@ -227,7 +227,7 @@ Examples:
 
                (packages
                 (append (list ratpoison xterm xsetroot font-dejavu git curl
-                              htop)
+                              htop fastfetch)
                         %base-packages))
 
                (services
@@ -319,12 +319,15 @@ Examples:
                (run mkfs.ext4 "-F" "-L" "GuixOS" root)
 
                (bold "[ 3/6 ] Mounting…")
-               (run mount root "/mnt")
+               ;; Give udev a moment to re-probe the new filesystems, and
+               ;; name the types rather than rely on autodetection.
+               (unless dry-run? (sleep 2))
+               (run mount "-t" "ext4" root "/mnt")
                (unless dry-run?
                  (mkdir-p "/mnt/boot/efi")
                  (mkdir-p "/mnt/gnu"))
-               (run mount efi "/mnt/boot/efi")
-               (run mount store "/mnt/gnu")
+               (run mount "-t" "vfat" efi "/mnt/boot/efi")
+               (run mount "-t" "ext4" store "/mnt/gnu")
                (run swapon swap)
                (unless dry-run? (mkdir-p "/mnt/etc"))
                ;; Send store writes to the target disk instead of the live
