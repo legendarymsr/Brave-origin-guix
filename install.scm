@@ -44,7 +44,10 @@
  (gnu packages admin)
  (gnu packages fonts)
  (gnu packages version-control)
- (guix gexp))
+ (gnu packages tls)
+ (gnu packages linux)
+ (guix gexp)
+ (guix build utils))
 
 ;;;
 ;;; Brave-origin channel definition (embedded so the installer can
@@ -74,20 +77,17 @@
 
 (define %extra-packages
   (list
-   ;; Tiling WM — run `ratpoison' after `startx' to get a graphical env
    ratpoison
-   ;; Terminal
    xterm
-   ;; Network
    curl
-   ;; Fonts (so xterm is legible)
    font-dejavu
-   ;; Handy during install
    git
    htop
    parted
-   ;; gptfdisk for sgdisk
-   gptfdisk))
+   gptfdisk
+   openssl    ; needed by install script (password hashing)
+   util-linux ; blkid
+   ))
 
 ;;;
 ;;; Extra services for the live ISO
@@ -107,8 +107,7 @@
            (plain-file "brave-origin-channels.scm"
                        %brave-origin-channel-snippet))))
 
-   ;; Seed system.scm + home.scm into /etc/brave-origin-templates/
-   ;; so the user has a starting point without needing network access.
+   ;; Seed install script + templates into /etc/brave-origin-templates/
    (simple-service
     'brave-origin-templates
     etc-service-type
@@ -116,42 +115,32 @@
      (list "brave-origin-templates/README"
            (plain-file "brave-origin-readme"
                        (string-append
-                        "Brave-origin-guix installation templates\n"
-                        "========================================\n"
+                        "Brave Origin Guix System Installer\n"
+                        "====================================\n"
                         "\n"
-                        "Brave Origin is NOT on this ISO — it is downloaded and installed\n"
-                        "on your target disk during `guix system init'.  The ISO stays\n"
-                        "small; your disk gets everything.\n"
+                        "One command installs everything — partitions, formats, and\n"
+                        "installs Guix System with Brave Origin.  Brave Origin is\n"
+                        "fetched from the brave-origin channel during the install,\n"
+                        "not from this ISO.\n"
                         "\n"
-                        "Files in this directory:\n"
+                        "Usage:\n"
                         "\n"
-                        "  system.scm  — operating-system declaration (includes brave-origin)\n"
-                        "               Copy to /mnt/etc/config.scm and edit FIXMEs.\n"
+                        "  brave-origin-install /dev/sdX\n"
                         "\n"
-                        "  home.scm    — home-environment declaration\n"
-                        "               Apply after first boot.\n"
+                        "(Use lsblk to find your disk name before running.)\n"
                         "\n"
-                        "Quick install steps:\n"
+                        "The script asks for: username, password, hostname, timezone.\n"
+                        "After it finishes: remove the USB and reboot.\n"
+                        "Log in, then run `startx' to launch Ratpoison.\n"
+                        "Brave Origin: C-t b inside Ratpoison.\n"
                         "\n"
-                        "  1. cfdisk /dev/sdX                          # partition\n"
-                        "  2. mkfs.ext4 /dev/sdXn                      # format root\n"
-                        "     mkfs.vfat /dev/sdX1                      # EFI (if UEFI)\n"
-                        "  3. mount /dev/sdXn /mnt\n"
-                        "     mkdir -p /mnt/boot/efi\n"
-                        "     mount /dev/sdX1 /mnt/boot/efi\n"
-                        "  4. cp /etc/brave-origin-templates/system.scm /mnt/etc/config.scm\n"
-                        "  5. nano /mnt/etc/config.scm                 # fill in FIXMEs\n"
-                        "  6. guix system init /mnt/etc/config.scm /mnt\n"
-                        "     (Brave Origin is fetched from the internet here)\n"
-                        "  7. reboot\n"
+                        "Optionally apply the home config after first boot:\n"
                         "\n"
-                        "After first boot:\n"
+                        "  bash /etc/brave-origin-templates/brave-origin-install /dev/sdX\n"
                         "\n"
-                        "  mkdir -p ~/.config/guix\n"
-                        "  cp /etc/channels.scm ~/.config/guix/channels.scm\n"
-                        "  guix pull\n"
-                        "  guix home reconfigure /etc/brave-origin-templates/home.scm\n"
-                        "  startx\n")))))))
+                        "  guix home reconfigure /etc/brave-origin-templates/home.scm\n")))
+     (list "brave-origin-templates/brave-origin-install"
+           (local-file "installer/brave-origin-install"))))))
 
 ;;;
 ;;; The custom installer OS
