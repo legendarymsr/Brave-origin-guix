@@ -35,12 +35,69 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # ── Install Guix ──────────────────────────────────────────────────
-      # PromyLOPh/guix-install-action installs Guix, starts the daemon,
-      # and authorises the official substitute (binary cache) server so
-      # we don't have to build the world from source.
+      # ── Install Guix (with retry) ─────────────────────────────────────
+      # ci.guix.gnu.org occasionally returns 502/503.  We download the
+      # latest stable binary from ftp.gnu.org instead — more reliable —
+      # and retry the download up to 5 times with exponential back-off.
       - name: Install Guix
-        uses: PromyLOPh/guix-install-action@v1
+        run: |
+          set -euo pipefail
+
+          # Find the latest stable release version
+          GUIX_VER=$(curl -fsSL https://ftp.gnu.org/gnu/guix/ \
+            | grep -oP 'guix-binary-\K[0-9]+\.[0-9]+\.[0-9]+' \
+            | sort -V | tail -1)
+          URL="https://ftp.gnu.org/gnu/guix/guix-binary-${GUIX_VER}.x86_64-linux.tar.xz"
+          echo "Downloading Guix ${GUIX_VER} from ${URL}"
+
+          # Retry download up to 5 times with exponential back-off
+          for attempt in 1 2 3 4 5; do
+            echo "Download attempt $attempt…"
+            if wget -q --tries=1 --timeout=120 "$URL" -O guix-binary.tar.xz; then
+              echo "Download succeeded on attempt $attempt."
+              break
+            fi
+            if [[ $attempt -eq 5 ]]; then
+              echo "All download attempts failed."
+              exit 1
+            fi
+            WAIT=$(( 15 * (2 ** (attempt - 1)) ))   # 15 30 60 120 s
+            echo "Retrying in ${WAIT}s…"
+            sleep "$WAIT"
+          done
+
+          # Install
+          sudo tar --warning=no-timestamp \
+               -xf guix-binary.tar.xz \
+               -C /
+          rm guix-binary.tar.xz
+
+          # Create build users
+          for i in $(seq -w 1 10); do
+            sudo useradd -r -g guixbuild \
+              -G guixbuild -d /var/empty -s "$(which nologin)" \
+              -c "Guix build user $i" --system "guixbuilder${i}" 2>/dev/null || true
+          done
+          sudo groupadd guixbuild 2>/dev/null || true
+          for i in $(seq -w 1 10); do
+            sudo usermod -aG guixbuild "guixbuilder${i}" 2>/dev/null || true
+          done
+
+          # Start daemon
+          sudo -E /var/guix/profiles/per-user/root/current-guix/bin/guix-daemon \
+            --build-users-group=guixbuild &>/var/log/guix-daemon.log &
+          disown $!
+          sleep 3
+
+          # Authorise substitute server
+          sudo /var/guix/profiles/per-user/root/current-guix/bin/guix archive \
+            --authorize < /var/guix/profiles/per-user/root/current-guix/share/guix/ci.guix.gnu.org.pub
+
+          # Put guix on PATH for subsequent steps
+          echo "/var/guix/profiles/per-user/root/current-guix/bin" >> "$GITHUB_PATH"
+          echo "GUIX_PROFILE=/var/guix/profiles/per-user/root/current-guix" >> "$GITHUB_ENV"
+          echo "LANG=en_US.utf8" >> "$GITHUB_ENV"
+        timeout-minutes: 20
 
       # ── Cache Guix store ──────────────────────────────────────────────
       # Caching shaves significant time off repeat builds.
