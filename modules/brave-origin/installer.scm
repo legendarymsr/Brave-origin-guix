@@ -17,13 +17,17 @@
 (define %brave-origin-xdefaults
   ;; ~/.Xdefaults for xterm (live image and installed systems): Xlib reads
   ;; it when no xrdb resources are loaded.  Replaces the one in
-  ;; (default-skeletons), whose two settings it keeps.  Tokyo Night colours, DejaVu Sans
+  ;; (default-skeletons), whose two settings it keeps.  Also installed as
+  ;; ~/.Xresources (for xrdb users, and because fastfetch reads the font
+  ;; from the lower-case `xterm*faceName' lines there).  Tokyo Night colours, DejaVu Sans
   ;; Mono 11 instead of the tiny black-on-white `fixed' default.
   "XTerm*termName: xterm-256color
 XTerm*utf8: always
 XTerm*metaSendsEscape: true
 XTerm*faceName: DejaVu Sans Mono
 XTerm*faceSize: 11
+xterm*faceName: DejaVu Sans Mono
+xterm*faceSize: 11
 XTerm*scrollBar: false
 XTerm*saveLines: 10000
 XTerm*selectToClipboard: true
@@ -263,6 +267,8 @@ Examples:
                 (cons* (list ".xinitrc" (plain-file "xinitrc" ,%xinitrc))
                        (list ".Xdefaults"
                              (plain-file "Xdefaults" ,#$%brave-origin-xdefaults))
+                       (list ".Xresources"
+                             (plain-file "Xresources" ,#$%brave-origin-xdefaults))
                        ;; Ours replaces the default ~/.Xdefaults.
                        (filter (lambda (skeleton)
                                  (not (string=? (car skeleton) ".Xdefaults")))

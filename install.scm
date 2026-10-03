@@ -106,6 +106,7 @@ exec ~a/bin/ratpoison
 (define %live-skeletons
   (cons* (list ".xsession" %live-xsession)
          (list ".Xdefaults" (plain-file "Xdefaults" %brave-origin-xdefaults))
+         (list ".Xresources" (plain-file "Xresources" %brave-origin-xdefaults))
          ;; Ours replaces the default ~/.Xdefaults.
          (filter (lambda (skeleton)
                    (not (string=? (car skeleton) ".Xdefaults")))
