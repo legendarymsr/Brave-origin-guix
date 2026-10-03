@@ -9,7 +9,10 @@
 ;;; image (live file systems, passwordless `guest' and root, disk tools,
 ;;; copy-on-write store for installing) and ships the one-command installer:
 ;;;
-;;;   sudo bash /etc/brave-origin-templates/brave-origin-install /dev/sdX
+;;;   sudo brave-origin-install /dev/sdX
+;;;
+;;; (a Guile program from (brave-origin installer); also at
+;;; /etc/brave-origin-templates/brave-origin-install, `--help' for usage).
 ;;;
 ;;; Text consoles are on Ctrl+Alt+F1..F6 (log in as root, no password).
 ;;; The Guix *guided* installer is not included: it can only be built from a
@@ -52,7 +55,8 @@
  (guix gexp)
  ;; This channel (build with `-L modules').
  (brave-origin services brave-origin)
- (brave-origin home services ratpoison))
+ (brave-origin home services ratpoison)
+ (brave-origin installer))
 
 (define %live-user "guest")             ; the passwordless user of installation-os
 
@@ -113,7 +117,8 @@ exec ~a/bin/ratpoison
    xterm
    xsetroot
    font-liberation
-   ;; brave-origin-install
+   ;; brave-origin-install (+ tools for doing it by hand)
+   brave-origin-installer
    curl
    parted
    gptfdisk
@@ -162,7 +167,7 @@ exec ~a/bin/ratpoison
                         "\n"
                         "One command installs everything:\n"
                         "\n"
-                        "  sudo bash /etc/brave-origin-templates/brave-origin-install /dev/sdX\n"
+                        "  sudo brave-origin-install /dev/sdX\n"
                         "\n"
                         "(Use lsblk to find your disk name.)\n"
                         "\n"
@@ -171,7 +176,9 @@ exec ~a/bin/ratpoison
                         "Log in, then run startx to launch Ratpoison.\n"
                         "Brave Origin: C-t b\n")))
      (list "brave-origin-templates/brave-origin-install"
-           (local-file "installer/brave-origin-install"))))))
+           brave-origin-install-program)
+     (list "brave-origin-templates/home.scm"
+           (local-file "home.scm"))))))
 
 ;;;
 ;;; Base services for a live medium.

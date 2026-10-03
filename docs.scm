@@ -38,6 +38,8 @@ advice, the EFF (https://www.eff.org) may be able to help.")
     . "Guix Home service — dead-simple Emacs (relative numbers, no bars).")
    ("modules/brave-origin/home/services/ratpoison.scm"
     . "Guix Home service — minimal Ratpoison with vim-style hjkl bindings.")
+   ("modules/brave-origin/installer.scm"
+    . "brave-origin-install, the live image's one-command installer, as a Guile program (program-file).  Run: sudo brave-origin-install /dev/sdX (--help, --dry-run).")
    ("update.scm"
     . "Version bumper.  Run with: guix repl -- update.scm")
    ("security.scm"

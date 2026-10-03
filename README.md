@@ -202,7 +202,7 @@ sudo dd if=$(guix system image -t iso9660 -L modules install.scm) \
 ```
 
 Ratpoison prefix is `C-t`: `C-t b` Brave Origin, `C-t t` xterm. To install, open
-an xterm and run `sudo bash /etc/brave-origin-templates/brave-origin-install /dev/sdX`.
+an xterm and run `sudo brave-origin-install /dev/sdX`.
 Installation templates are in `/etc/brave-origin-templates/` and the channel snippet is at `/etc/channels.scm`.
 
 See `install.scm` for the full build instructions and step-by-step install guide.

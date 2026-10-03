@@ -163,7 +163,7 @@ jobs:
             - Live Ratpoison session (prefix `C-t`: `b` Brave Origin, `t` xterm)
             - Brave Origin + setuid `chrome-sandbox` via `brave-origin-service-type`
             - Brave Origin channel pre-seeded at `/etc/channels.scm`
-            - One-command installer: `sudo bash /etc/brave-origin-templates/brave-origin-install /dev/sdX`
+            - One-command installer: `sudo brave-origin-install /dev/sdX` (`--help` for usage, `--dry-run` to preview)
             - Templates at `/etc/brave-origin-templates/`
 
             ### Write to USB
