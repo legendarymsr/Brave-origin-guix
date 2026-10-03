@@ -27,8 +27,7 @@
 ;;; Partition layout (GPT, UEFI):
 ;;;   1 GB   EFI   (FAT32, /boot/efi)
 ;;;   4 GB   swap
-;;;   4 GB   /gnu  (Guix store -- keeps root small and clean)
-;;;   rest   /     (root, ext4)
+;;;   rest   /     (root, ext4; holds /gnu too)
 ;;;
 ;;; Steps: partition, format, mount (and start the live image's cow-store on
 ;;; /mnt), write /mnt/etc/config.scm, pull the brave-origin channel from
@@ -83,7 +82,7 @@
        brave-origin-install --help
 
 One-command Guix System + Brave Origin installer.  ERASES DISK, then:
-  1 GB EFI (FAT32, /boot/efi) | 4 GB swap | 4 GB /gnu (ext4) | rest / (ext4)
+  1 GB EFI (FAT32, /boot/efi) | 4 GB swap | rest / (ext4, holds /gnu)
 writes /mnt/etc/config.scm, pulls the brave-origin channel and runs
 `guix system init'.  Asks for username, password, hostname and timezone.
 
@@ -170,7 +169,7 @@ Examples:
          (define %xinitrc
            "#!/bin/sh\nxsetroot -cursor_name left_ptr\nexec ratpoison\n")
 
-         (define (system-config host tz user hash root efi swap gnu)
+         (define (system-config host tz user hash root efi swap)
            ;; Return the forms of /mnt/etc/config.scm.
            `((use-modules (gnu)
                           (brave-origin services brave-origin))
@@ -204,10 +203,6 @@ Examples:
                          (mount-point "/boot/efi")
                          (device (uuid ,efi 'fat32))
                          (type "vfat"))
-                       (file-system
-                         (mount-point "/gnu")
-                         (device (uuid ,gnu 'ext4))
-                         (type "ext4"))
                        %base-file-systems))
 
                (users
@@ -270,8 +265,7 @@ Examples:
 
            (let ((efi   (partition-name disk 1))
                  (swap  (partition-name disk 2))
-                 (store (partition-name disk 3))
-                 (root  (partition-name disk 4)))
+                 (root  (partition-name disk 3)))
              (bold rule)
              (bold " Brave Origin Guix System Installer~a"
                    (if dry-run? "  (dry run)" ""))
@@ -281,8 +275,7 @@ Examples:
              (yellow "  Layout:")
              (yellow "    ~a  →  1 GB   EFI   (FAT32, /boot/efi)" efi)
              (yellow "    ~a  →  4 GB   swap" swap)
-             (yellow "    ~a  →  4 GB   /gnu  (Guix store)" store)
-             (yellow "    ~a  →  rest   /     (root, ext4)" root)
+             (yellow "    ~a  →  rest   /     (root, ext4; holds /gnu too)" root)
              (newline)
              (red "  ALL DATA ON ~a WILL BE DESTROYED." disk)
              (newline)
@@ -305,17 +298,17 @@ Examples:
                     "--change-name=1:EFI" disk)
                (run sgdisk "--new=2:0:+4G" "--typecode=2:8200"
                     "--change-name=2:swap" disk)
-               (run sgdisk "--new=3:0:+4G" "--typecode=3:8300"
-                    "--change-name=3:gnu" disk)
-               (run sgdisk "--new=4:0:0" "--typecode=4:8300"
-                    "--change-name=4:GuixOS" disk)
+               ;; No separate /gnu: a 4 GB store partition is too small for
+               ;; the system plus the pulled Guix (the NixOS twin of this
+               ;; installer filled its 4 GB /nix in a test install).
+               (run sgdisk "--new=3:0:0" "--typecode=3:8300"
+                    "--change-name=3:GuixOS" disk)
                (run partprobe disk)
                (unless dry-run? (sleep 1))
 
                (bold "[ 2/6 ] Formatting…")
                (run mkfs.vfat "-F32" "-n" "EFI" efi)
                (run mkswap "-L" "swap" swap)
-               (run mkfs.ext4 "-F" "-L" "gnu" store)
                (run mkfs.ext4 "-F" "-L" "GuixOS" root)
 
                (bold "[ 3/6 ] Mounting…")
@@ -324,10 +317,8 @@ Examples:
                (unless dry-run? (sleep 2))
                (run mount "-t" "ext4" root "/mnt")
                (unless dry-run?
-                 (mkdir-p "/mnt/boot/efi")
-                 (mkdir-p "/mnt/gnu"))
+                 (mkdir-p "/mnt/boot/efi"))
                (run mount "-t" "vfat" efi "/mnt/boot/efi")
-               (run mount "-t" "ext4" store "/mnt/gnu")
                (run swapon swap)
                (unless dry-run? (mkdir-p "/mnt/etc"))
                ;; Send store writes to the target disk instead of the live
@@ -343,12 +334,11 @@ Examples:
                                 (system-config host tz user
                                                (sha512-crypt password)
                                                "ROOT-UUID" "EFI-UUID"
-                                               "SWAP-UUID" "GNU-UUID")
+                                               "SWAP-UUID")
                                 (system-config host tz user
                                                (sha512-crypt password)
                                                (uuid-of root) (uuid-of efi)
-                                               (uuid-of swap)
-                                               (uuid-of store)))))
+                                               (uuid-of swap)))))
                  (if dry-run?
                      (begin
                        (display "  would write /mnt/etc/config.scm:\n\n")
@@ -423,7 +413,7 @@ Examples:
     (synopsis "One-command Guix System + Brave Origin installer")
     (description
      "@command{brave-origin-install DISK} partitions and formats DISK (EFI,
-swap, @file{/gnu} and root), writes an @code{operating-system} with Brave
+swap and root), writes an @code{operating-system} with Brave
 Origin and Ratpoison, pulls the brave-origin channel and runs @command{guix
 system init}.  Meant for the Brave-origin-guix live image.")
     (license license:gpl3+)))
