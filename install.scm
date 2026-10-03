@@ -51,6 +51,7 @@
  (gnu packages ratpoison)               ; ratpoison
  (gnu packages tls)                     ; openssl
  (gnu packages linux)                   ; util-linux (blkid)
+ (gnu packages ncurses)                 ; ncurses
  (gnu packages xorg)                    ; xterm, xsetroot
  (guix gexp)
  ;; This channel (build with `-L modules').
@@ -103,8 +104,9 @@ exec ~a/bin/ratpoison
        (chmod #$output #o555))))
 
 (define %live-skeletons
-  (cons (list ".xsession" %live-xsession)
-        (default-skeletons)))
+  (cons* (list ".xsession" %live-xsession)
+         (list ".Xdefaults" (plain-file "Xdefaults" %brave-origin-xdefaults))
+         (default-skeletons)))
 
 ;;;
 ;;; Packages and services on top of the installation image.
@@ -117,7 +119,9 @@ exec ~a/bin/ratpoison
    xterm
    xsetroot
    font-liberation
+   font-dejavu                          ; xterm face (~/.Xdefaults)
    fastfetch
+   ncurses                              ; clear, reset, tput
    ;; brave-origin-install (+ tools for doing it by hand)
    brave-origin-installer
    curl

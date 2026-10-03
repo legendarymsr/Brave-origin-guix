@@ -10,8 +10,41 @@
   #:use-module (gnu packages base)      ;coreutils
   #:use-module (gnu packages disk)      ;gptfdisk, parted, dosfstools
   #:use-module (gnu packages linux)     ;util-linux, e2fsprogs
-  #:export (brave-origin-install-program
+  #:export (%brave-origin-xdefaults
+            brave-origin-install-program
             brave-origin-installer))
+
+(define %brave-origin-xdefaults
+  ;; ~/.Xdefaults for xterm (live image and installed systems): Xlib reads
+  ;; it when no xrdb resources are loaded.  Tokyo Night colours, DejaVu Sans
+  ;; Mono 11 instead of the tiny black-on-white `fixed' default.
+  "XTerm*termName: xterm-256color
+XTerm*locale: true
+XTerm*faceName: DejaVu Sans Mono
+XTerm*faceSize: 11
+XTerm*scrollBar: false
+XTerm*saveLines: 10000
+XTerm*selectToClipboard: true
+XTerm*background: #1a1b26
+XTerm*foreground: #c0caf5
+XTerm*cursorColor: #c0caf5
+XTerm*color0: #15161e
+XTerm*color1: #f7768e
+XTerm*color2: #9ece6a
+XTerm*color3: #e0af68
+XTerm*color4: #7aa2f7
+XTerm*color5: #bb9af7
+XTerm*color6: #7dcfff
+XTerm*color7: #a9b1d6
+XTerm*color8: #414868
+XTerm*color9: #f7768e
+XTerm*color10: #9ece6a
+XTerm*color11: #e0af68
+XTerm*color12: #7aa2f7
+XTerm*color13: #bb9af7
+XTerm*color14: #7dcfff
+XTerm*color15: #c0caf5
+")
 
 ;;; Commentary:
 ;;;
@@ -174,8 +207,8 @@ Examples:
            `((use-modules (gnu)
                           (brave-origin services brave-origin))
              (use-service-modules base dbus desktop networking xorg)
-             (use-package-modules admin curl fonts ratpoison version-control
-                                  xorg)
+             (use-package-modules admin curl fonts ncurses ratpoison
+                                  version-control xorg)
 
              (operating-system
                (host-name ,host)
@@ -215,14 +248,17 @@ Examples:
                           '("wheel" "netdev" "audio" "video" "input")))
                        %base-user-accounts))
 
-               ;; ~/.xinitrc for new accounts: `startx' starts Ratpoison.
+               ;; For new accounts: ~/.xinitrc (`startx' starts Ratpoison)
+               ;; and ~/.Xdefaults (readable xterm).
                (skeletons
-                (cons (list ".xinitrc" (plain-file "xinitrc" ,%xinitrc))
-                      (default-skeletons)))
+                (cons* (list ".xinitrc" (plain-file "xinitrc" ,%xinitrc))
+                       (list ".Xdefaults"
+                             (plain-file "Xdefaults" ,#$%brave-origin-xdefaults))
+                       (default-skeletons)))
 
                (packages
                 (append (list ratpoison xterm xsetroot font-dejavu git curl
-                              htop fastfetch)
+                              htop fastfetch ncurses)
                         %base-packages))
 
                (services
