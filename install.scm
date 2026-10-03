@@ -106,7 +106,10 @@ exec ~a/bin/ratpoison
 (define %live-skeletons
   (cons* (list ".xsession" %live-xsession)
          (list ".Xdefaults" (plain-file "Xdefaults" %brave-origin-xdefaults))
-         (default-skeletons)))
+         ;; Ours replaces the default ~/.Xdefaults.
+         (filter (lambda (skeleton)
+                   (not (string=? (car skeleton) ".Xdefaults")))
+                 (default-skeletons))))
 
 ;;;
 ;;; Packages and services on top of the installation image.
@@ -143,7 +146,11 @@ exec ~a/bin/ratpoison
              (allow-empty-passwords? #t)
              (xorg-configuration
               (xorg-configuration
-               (keyboard-layout (keyboard-layout "us"))))))
+               (keyboard-layout (keyboard-layout "us"))
+               ;; No screen saver / DPMS blanking on the live desktop.
+               (server-arguments
+                (cons* "-s" "0" "-dpms"
+                       %default-xorg-server-arguments))))))
 
    ;; ~/.ratpoisonrc & co. for the live user.
    (service guix-home-service-type

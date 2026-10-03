@@ -16,10 +16,12 @@
 
 (define %brave-origin-xdefaults
   ;; ~/.Xdefaults for xterm (live image and installed systems): Xlib reads
-  ;; it when no xrdb resources are loaded.  Tokyo Night colours, DejaVu Sans
+  ;; it when no xrdb resources are loaded.  Replaces the one in
+  ;; (default-skeletons), whose two settings it keeps.  Tokyo Night colours, DejaVu Sans
   ;; Mono 11 instead of the tiny black-on-white `fixed' default.
   "XTerm*termName: xterm-256color
-XTerm*locale: true
+XTerm*utf8: always
+XTerm*metaSendsEscape: true
 XTerm*faceName: DejaVu Sans Mono
 XTerm*faceSize: 11
 XTerm*scrollBar: false
@@ -261,7 +263,10 @@ Examples:
                 (cons* (list ".xinitrc" (plain-file "xinitrc" ,%xinitrc))
                        (list ".Xdefaults"
                              (plain-file "Xdefaults" ,#$%brave-origin-xdefaults))
-                       (default-skeletons)))
+                       ;; Ours replaces the default ~/.Xdefaults.
+                       (filter (lambda (skeleton)
+                                 (not (string=? (car skeleton) ".Xdefaults")))
+                               (default-skeletons))))
 
                (packages
                 (append (list ratpoison xterm xsetroot font-dejavu git curl
@@ -272,12 +277,19 @@ Examples:
                 (cons* (service brave-origin-service-type)
                        ;; X for xinit, plus `startx'; elogind lets X run
                        ;; without root on the login VT.
+                       ;; -s 0 -dpms: no screen blanking.
                        (service xorg-server-service-type
                                 (xorg-configuration
-                                 (keyboard-layout keyboard-layout)))
+                                 (keyboard-layout keyboard-layout)
+                                 (server-arguments
+                                  (cons* "-s" "0" "-dpms"
+                                         %default-xorg-server-arguments))))
                        (service startx-command-service-type
                                 (xorg-configuration
-                                 (keyboard-layout keyboard-layout)))
+                                 (keyboard-layout keyboard-layout)
+                                 (server-arguments
+                                  (cons* "-s" "0" "-dpms"
+                                         %default-xorg-server-arguments))))
                        (service elogind-service-type)
                        (service dbus-root-service-type)
                        (service network-manager-service-type)
