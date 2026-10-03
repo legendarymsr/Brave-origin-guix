@@ -10,7 +10,7 @@
 ;;;   sudo dd if=result of=/dev/sdX bs=4M status=progress oflag=sync
 ;;;
 ;;; Once booted (terminal-only live env):
-;;;   brave-origin-install /dev/sdX
+;;;   bash /etc/brave-origin-templates/brave-origin-install /dev/sdX
 ;;;
 ;;; SPDX-License-Identifier: GPL-3.0-or-later
 ;;; Copyright © 2026 legendarymsr
@@ -21,10 +21,10 @@
  (gnu system install)
  (gnu services)
  (gnu services base)
- (gnu packages curl)
- (gnu packages admin)
- (gnu packages linux)
- (gnu packages tls)
+ (gnu packages curl)   ; curl
+ (gnu packages disk)   ; parted, gptfdisk
+ (gnu packages tls)    ; openssl
+ (gnu packages linux)  ; util-linux (blkid)
  (guix gexp))
 
 (define %brave-origin-channel-snippet
@@ -34,18 +34,15 @@
         (branch \"main\"))\n\
       %default-channels)\n")
 
-;;; Extra packages for the live ISO — only what the install script needs.
+;;; Minimal extra packages — only what brave-origin-install needs.
 (define %extra-packages
   (list
    curl
    parted
    gptfdisk
-   openssl    ; openssl passwd -6 for password hashing
-   util-linux ; blkid
-   nss-certs  ; TLS roots for guix pull
-   ))
+   openssl
+   util-linux))
 
-;;; Extra services — seed channel hint and install script.
 (define %extra-services
   (list
    (simple-service
