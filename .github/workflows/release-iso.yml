@@ -1,0 +1,143 @@
+name: Build and release installer ISO
+
+on:
+  # Push a version tag to trigger a release: git tag v1.0.0 && git push origin v1.0.0
+  push:
+    tags:
+      - 'v*.*.*'
+
+  # Manual trigger — useful for testing or cutting a one-off release
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag (e.g. v1.0.0 or nightly)'
+        required: true
+        default: 'nightly'
+      prerelease:
+        description: 'Mark as pre-release?'
+        required: false
+        default: 'false'
+
+  # Nightly build — comment out if you don't want scheduled releases
+  schedule:
+    - cron: '0 3 * * 1'   # every Monday at 03:00 UTC
+
+jobs:
+  build-iso:
+    name: Build ISO
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write   # needed to create GitHub releases
+
+    steps:
+      # ── Checkout ──────────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── Install Guix ──────────────────────────────────────────────────
+      # PromyLOPh/guix-install-action installs Guix, starts the daemon,
+      # and authorises the official substitute (binary cache) server so
+      # we don't have to build the world from source.
+      - name: Install Guix
+        uses: PromyLOPh/guix-install-action@v1
+
+      # ── Cache Guix store ──────────────────────────────────────────────
+      # Caching shaves significant time off repeat builds.
+      # The cache key rotates weekly; old entries expire automatically.
+      - name: Cache Guix store
+        uses: actions/cache@v4
+        with:
+          path: /gnu/store
+          key: guix-store-${{ runner.os }}-${{ hashFiles('install.scm') }}-${{ github.run_week }}
+          restore-keys: |
+            guix-store-${{ runner.os }}-${{ hashFiles('install.scm') }}-
+            guix-store-${{ runner.os }}-
+
+      # ── Update Guix ───────────────────────────────────────────────────
+      # Pull the latest Guix channel so we get current package versions
+      # and build fixes.  The brave-origin channel is NOT needed here
+      # because install.scm only references standard Guix modules.
+      - name: Update Guix
+        run: guix pull --disable-authentication
+        timeout-minutes: 30
+
+      # ── Extra disk space ──────────────────────────────────────────────
+      # GitHub's ubuntu-latest runner ships with ~25 GB free.
+      # A Guix system ISO is typically 1–1.5 GB; the build itself needs
+      # another 3–5 GB of store.  Remove unneeded runner pre-installs
+      # if the build fails with "no space left on device".
+      - name: Free up disk space (optional)
+        run: |
+          df -h
+          sudo rm -rf /usr/local/lib/android /opt/ghc /usr/share/dotnet || true
+          df -h
+
+      # ── Build ISO ─────────────────────────────────────────────────────
+      - name: Build installer ISO
+        run: |
+          guix system image \
+            --no-offload \
+            -t iso9660 \
+            install.scm \
+            -o brave-origin-installer.iso
+        timeout-minutes: 120
+
+      # ── Checksum ──────────────────────────────────────────────────────
+      - name: Generate SHA-256 checksum
+        run: |
+          sha256sum brave-origin-installer.iso \
+            | tee brave-origin-installer.iso.sha256
+          echo "ISO size: $(du -sh brave-origin-installer.iso | cut -f1)"
+
+      # ── Determine release tag ─────────────────────────────────────────
+      - name: Set release tag
+        id: tag
+        run: |
+          if [[ "${{ github.event_name }}" == "push" ]]; then
+            echo "tag=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+          elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "tag=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            # scheduled nightly
+            echo "tag=nightly-$(date -u +%Y%m%d)" >> "$GITHUB_OUTPUT"
+          fi
+
+      # ── Create GitHub release and upload assets ───────────────────────
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: Brave Origin Installer ${{ steps.tag.outputs.tag }}
+          prerelease: >-
+            ${{
+              github.event_name == 'schedule' ||
+              (github.event_name == 'workflow_dispatch' && inputs.prerelease == 'true')
+            }}
+          body: |
+            ## Brave Origin Installer ISO
+
+            Custom Guix System installer with Brave Origin (nightly) pre-configured.
+
+            ### What's included
+            - Ratpoison (tiling WM) + xterm available in the live environment
+            - Brave Origin channel snippet pre-seeded at `/etc/channels.scm`
+            - `system.scm` + `home.scm` templates at `/etc/brave-origin-templates/`
+
+            ### Install
+            ```sh
+            # Write to USB (replace sdX with your drive)
+            sudo dd if=brave-origin-installer.iso of=/dev/sdX bs=4M status=progress oflag=sync
+            ```
+
+            ### Verify
+            ```sh
+            sha256sum -c brave-origin-installer.iso.sha256
+            ```
+
+            ### After booting
+            See `/etc/brave-origin-templates/README` on the live system,
+            or the [repo README](https://github.com/legendarymsr/Brave-origin-guix#custom-installer-iso).
+          files: |
+            brave-origin-installer.iso
+            brave-origin-installer.iso.sha256
