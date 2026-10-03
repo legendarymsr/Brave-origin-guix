@@ -66,14 +66,26 @@
 ;;;   guix repl -- update.scm --dry-run
 ;;; then: guix build -L modules brave-origin-nightly && git commit -a
 
+;;; ── Emacs ───────────────────────────────────────────────────────────────
+;;; Dead-simple Emacs: relative numbers, no splash, no bars.
+;;;
+;;;   (use-modules (brave-origin home services emacs))
+;;;   (service home-emacs-simple-service-type)
+
+;;; ── Ratpoison ────────────────────────────────────────────────────────────
+;;; Minimal tiling WM.  Vim-style hjkl focus, C-t b for Brave Origin.
+;;;
+;;;   (use-modules (brave-origin home services ratpoison))
+;;;   (service home-ratpoison-service-type)
+
 ;;; ── Layout ──────────────────────────────────────────────────────────────
 ;;;   .guix-channel                                 channel metadata (Scheme)
 ;;;   modules/brave-origin/packages/brave-origin.scm
-;;;   modules/brave-origin/services/brave-origin.scm       Guix System
-;;;   modules/brave-origin/home/services/brave-origin.scm  Guix Home
+;;;   modules/brave-origin/services/brave-origin.scm           Guix System
+;;;   modules/brave-origin/home/services/brave-origin.scm      Guix Home
+;;;   modules/brave-origin/home/services/emacs.scm             Guix Home
+;;;   modules/brave-origin/home/services/ratpoison.scm         Guix Home
 ;;;   update.scm  security.scm  README.scm  LICENSE (GPL-3.0)
-;;;
-;;; Not ported from the Nix flake: the XFCE and nixvim modules.
 ;;;
 ;;; Brave itself is MPL-2.0 and ships as prebuilt binaries; this channel is
 ;;; not meant for upstream Guix.
