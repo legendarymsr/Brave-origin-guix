@@ -1,12 +1,10 @@
 name: Build and release installer ISO
 
 on:
-  # Push a version tag to trigger a release: git tag v1.0.0 && git push origin v1.0.0
   push:
     tags:
       - 'v*.*.*'
 
-  # Manual trigger — useful for testing or cutting a one-off release
   workflow_dispatch:
     inputs:
       tag:
@@ -18,9 +16,8 @@ on:
         required: false
         default: 'false'
 
-  # Nightly build — comment out if you don't want scheduled releases
   schedule:
-    - cron: '0 3 * * 1'   # every Monday at 03:00 UTC
+    - cron: '0 3 * * 1'
 
 jobs:
   build-iso:
@@ -28,118 +25,90 @@ jobs:
     runs-on: ubuntu-latest
 
     permissions:
-      contents: write   # needed to create GitHub releases
+      contents: write
 
     steps:
-      # ── Checkout ──────────────────────────────────────────────────────
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # ── Install Guix (with retry) ─────────────────────────────────────
-      # ci.guix.gnu.org occasionally returns 502/503.  We download the
-      # latest stable binary from ftp.gnu.org instead — more reliable —
-      # and retry the download up to 5 times with exponential back-off.
+      # ci.guix.gnu.org occasionally returns 502/503.  Download the latest
+      # stable binary from ftp.gnu.org with 5-attempt exponential back-off.
       - name: Install Guix
         run: |
           set -euo pipefail
 
-          # Find the latest stable release version
           GUIX_VER=$(curl -fsSL https://ftp.gnu.org/gnu/guix/ \
             | grep -oP 'guix-binary-\K[0-9]+\.[0-9]+\.[0-9]+' \
             | sort -V | tail -1)
           URL="https://ftp.gnu.org/gnu/guix/guix-binary-${GUIX_VER}.x86_64-linux.tar.xz"
           echo "Downloading Guix ${GUIX_VER} from ${URL}"
 
-          # Retry download up to 5 times with exponential back-off
           for attempt in 1 2 3 4 5; do
             echo "Download attempt $attempt…"
             if wget -q --tries=1 --timeout=120 "$URL" -O guix-binary.tar.xz; then
-              echo "Download succeeded on attempt $attempt."
+              echo "Download succeeded."
               break
             fi
-            if [[ $attempt -eq 5 ]]; then
-              echo "All download attempts failed."
-              exit 1
-            fi
-            WAIT=$(( 15 * (2 ** (attempt - 1)) ))   # 15 30 60 120 s
-            echo "Retrying in ${WAIT}s…"
-            sleep "$WAIT"
+            [[ $attempt -eq 5 ]] && { echo "All attempts failed."; exit 1; }
+            WAIT=$(( 15 * (2 ** (attempt - 1)) ))
+            echo "Retrying in ${WAIT}s…"; sleep "$WAIT"
           done
 
-          # Install
-          sudo tar --warning=no-timestamp \
-               -xf guix-binary.tar.xz \
-               -C /
+          sudo tar --warning=no-timestamp -xf guix-binary.tar.xz -C /
           rm guix-binary.tar.xz
 
-          # Create build users
+          # Group must exist before useradd references it
+          sudo groupadd --system guixbuild 2>/dev/null || true
           for i in $(seq -w 1 10); do
-            sudo useradd -r -g guixbuild \
-              -G guixbuild -d /var/empty -s "$(which nologin)" \
+            sudo useradd -r -g guixbuild -G guixbuild \
+              -d /var/empty -s "$(which nologin)" \
               -c "Guix build user $i" --system "guixbuilder${i}" 2>/dev/null || true
           done
-          sudo groupadd guixbuild 2>/dev/null || true
-          for i in $(seq -w 1 10); do
-            sudo usermod -aG guixbuild "guixbuilder${i}" 2>/dev/null || true
-          done
 
-          # Start daemon
-          sudo -E /var/guix/profiles/per-user/root/current-guix/bin/guix-daemon \
+          sudo /var/guix/profiles/per-user/root/current-guix/bin/guix-daemon \
             --build-users-group=guixbuild &>/var/log/guix-daemon.log &
           disown $!
           sleep 3
 
-          # Authorise substitute server
           sudo /var/guix/profiles/per-user/root/current-guix/bin/guix archive \
             --authorize < /var/guix/profiles/per-user/root/current-guix/share/guix/ci.guix.gnu.org.pub
 
-          # Put guix on PATH for subsequent steps
           echo "/var/guix/profiles/per-user/root/current-guix/bin" >> "$GITHUB_PATH"
           echo "GUIX_PROFILE=/var/guix/profiles/per-user/root/current-guix" >> "$GITHUB_ENV"
           echo "LANG=en_US.utf8" >> "$GITHUB_ENV"
         timeout-minutes: 20
 
-      # ── Cache Guix store ──────────────────────────────────────────────
-      # Caching shaves significant time off repeat builds.
-      # The cache key rotates weekly; old entries expire automatically.
       - name: Cache Guix store
         uses: actions/cache@v4
         with:
           path: /gnu/store
-          key: guix-store-${{ runner.os }}-${{ hashFiles('install.scm') }}-${{ github.run_week }}
+          key: guix-store-${{ runner.os }}-${{ hashFiles('install.scm') }}-${{ github.run_id }}
           restore-keys: |
             guix-store-${{ runner.os }}-${{ hashFiles('install.scm') }}-
             guix-store-${{ runner.os }}-
 
-      # ── Extra disk space ──────────────────────────────────────────────
-      # GitHub's ubuntu-latest runner ships with ~25 GB free.
-      # A Guix system ISO is typically 1–1.5 GB; the build itself needs
-      # another 3–5 GB of store.  Remove unneeded runner pre-installs
-      # if the build fails with "no space left on device".
-      - name: Free up disk space (optional)
+      - name: Free up disk space
         run: |
           df -h
           sudo rm -rf /usr/local/lib/android /opt/ghc /usr/share/dotnet || true
           df -h
 
-      # ── Build ISO ─────────────────────────────────────────────────────
+      # guix system image always writes a `result` symlink; -o is not a valid flag.
       - name: Build installer ISO
         run: |
           guix system image \
             --no-offload \
             -t iso9660 \
-            install.scm \
-            -o brave-origin-installer.iso
+            install.scm
+          # Copy the store output to a predictable filename for upload
+          cp -L result brave-origin-installer.iso
+          echo "ISO size: $(du -sh brave-origin-installer.iso | cut -f1)"
         timeout-minutes: 120
 
-      # ── Checksum ──────────────────────────────────────────────────────
       - name: Generate SHA-256 checksum
         run: |
-          sha256sum brave-origin-installer.iso \
-            | tee brave-origin-installer.iso.sha256
-          echo "ISO size: $(du -sh brave-origin-installer.iso | cut -f1)"
+          sha256sum brave-origin-installer.iso | tee brave-origin-installer.iso.sha256
 
-      # ── Determine release tag ─────────────────────────────────────────
       - name: Set release tag
         id: tag
         run: |
@@ -148,34 +117,31 @@ jobs:
           elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             echo "tag=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
           else
-            # scheduled nightly
             echo "tag=nightly-$(date -u +%Y%m%d)" >> "$GITHUB_OUTPUT"
           fi
 
-      # ── Create GitHub release and upload assets ───────────────────────
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.tag.outputs.tag }}
-          name: Brave Origin Installer ${{ steps.tag.outputs.tag }}
+          name: Brave Origin Guix Installer ${{ steps.tag.outputs.tag }}
           prerelease: >-
             ${{
               github.event_name == 'schedule' ||
               (github.event_name == 'workflow_dispatch' && inputs.prerelease == 'true')
             }}
           body: |
-            ## Brave Origin Installer ISO
+            ## Brave Origin Guix System Installer ISO
 
             Custom Guix System installer with Brave Origin (nightly) pre-configured.
 
             ### What's included
-            - Ratpoison (tiling WM) + xterm available in the live environment
-            - Brave Origin channel snippet pre-seeded at `/etc/channels.scm`
-            - `system.scm` + `home.scm` templates at `/etc/brave-origin-templates/`
+            - Brave Origin channel pre-seeded at `/etc/channels.scm`
+            - One-command installer: `brave-origin-install /dev/sdX`
+            - Templates at `/etc/brave-origin-templates/`
 
-            ### Install
+            ### Write to USB
             ```sh
-            # Write to USB (replace sdX with your drive)
             sudo dd if=brave-origin-installer.iso of=/dev/sdX bs=4M status=progress oflag=sync
             ```
 
@@ -183,10 +149,6 @@ jobs:
             ```sh
             sha256sum -c brave-origin-installer.iso.sha256
             ```
-
-            ### After booting
-            See `/etc/brave-origin-templates/README` on the live system,
-            or the [repo README](https://github.com/legendarymsr/Brave-origin-guix#custom-installer-iso).
           files: |
             brave-origin-installer.iso
             brave-origin-installer.iso.sha256
