@@ -30,3 +30,15 @@ specifically to distribute Brave Origin.
 
 If you just want to use the channel, none of this matters — do whatever you want.
 If you are redistributing or building on top of it, GPL-3.0 is recommended.
+
+───────────────────────────────────────────────────────────────────────────────
+
+Disclaimer
+──────────
+Nothing in this file or this repository is legal advice. This is just an
+explanation of the licensing choices made here, written by a developer, not a
+lawyer. If you need actual legal advice on FOSS licensing — compliance,
+distribution, dual licensing, or anything else — the Electronic Frontier
+Foundation (EFF) is a good starting point and may be able to help:
+
+  https://www.eff.org
