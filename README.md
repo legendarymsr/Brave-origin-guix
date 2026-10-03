@@ -4,6 +4,8 @@ Brave Origin (nightly) browser, packaged as a [GNU Guix](https://guix.gnu.org) c
 
 Nix counterpart: [brave-origin-nix](https://github.com/legendarymsr/brave-origin-nix)
 
+![Installed Brave Origin Guix System: Ratpoison with fastfetch in xterm, Emacs editing /etc/config.scm, and Brave Origin](screenshots/showcase.png)
+
 ---
 
 ## Add the channel
