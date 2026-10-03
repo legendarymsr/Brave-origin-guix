@@ -57,7 +57,6 @@ jobs:
           sudo tar --warning=no-timestamp -xf guix-binary.tar.xz -C /
           rm guix-binary.tar.xz
 
-          # Group must exist before useradd references it
           sudo groupadd --system guixbuild 2>/dev/null || true
           for i in $(seq -w 1 10); do
             sudo useradd -r -g guixbuild -G guixbuild \
@@ -93,15 +92,17 @@ jobs:
           sudo rm -rf /usr/local/lib/android /opt/ghc /usr/share/dotnet || true
           df -h
 
-      # guix system image always writes a `result` symlink; -o is not a valid flag.
+      # The guix-daemon socket is root-only; run under sudo.
+      # guix system image writes a `result` symlink in the cwd.
       - name: Build installer ISO
         run: |
-          guix system image \
+          sudo --preserve-env=GUIX_PROFILE,LANG,HOME \
+            /var/guix/profiles/per-user/root/current-guix/bin/guix system image \
             --no-offload \
             -t iso9660 \
             install.scm
-          # Copy the store output to a predictable filename for upload
-          cp -L result brave-origin-installer.iso
+          sudo cp -L result brave-origin-installer.iso
+          sudo chown "$(id -u):$(id -g)" brave-origin-installer.iso
           echo "ISO size: $(du -sh brave-origin-installer.iso | cut -f1)"
         timeout-minutes: 120
 
@@ -137,7 +138,7 @@ jobs:
 
             ### What's included
             - Brave Origin channel pre-seeded at `/etc/channels.scm`
-            - One-command installer: `brave-origin-install /dev/sdX`
+            - One-command installer: `bash /etc/brave-origin-templates/brave-origin-install /dev/sdX`
             - Templates at `/etc/brave-origin-templates/`
 
             ### Write to USB
